@@ -3,8 +3,9 @@
 # Use Python to solve a Minesweeper board!
 # Using the board class to play online
 
+from asyncore import read
 from re import search
-from turtle import right
+from random import randint
 
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
@@ -42,6 +43,8 @@ def make_board(elems):
             elif "open" in tag["class"][1]:
                 # print("class is", tag["class"])
                 board[y][x] = search("[0-9]", tag["class"][1]).group()
+            elif "bombmisflagged" in tag["class"][1]:
+                board[y][x] = "f"
             elif "flag" in tag["class"][1]:
                 board[y][x] = "F"
             elif "bomb" in tag["class"][1]:
@@ -61,42 +64,46 @@ def main():
         square = driver.find_element(By.ID, f"{y+1}_{x+1}")
         ActionChains(driver).context_click(square).perform()
     
-    src = BeautifulSoup(driver.page_source, "lxml")
-    squares = src.find_all(class_="square")
-    make_board(squares)
-
-    driver.find_element(By.ID, "7_19").click()
-
-    src = BeautifulSoup(driver.page_source, "lxml")
-    squares = src.find_all(class_="square")
-    board = make_board(squares)
-    
     puzzle = minesweeper_board.Puzzle()
-    puzzle.load_board(board)
-    puzzle.print()
     
-    easy_flags = puzzle._mark_easy_flags()
-    for x, y in easy_flags:
-        right_click(x, y)
+    def read_and_load():
+        src = BeautifulSoup(driver.page_source, "lxml")
+        squares = src.find_all(class_="square")
+        board = make_board(squares)
+        puzzle.load_board(board)
     
+    left_click(randint(0, 29), randint(0, 15))
 
-    src = BeautifulSoup(driver.page_source, "lxml")
-    squares = src.find_all(class_="square")
-    board = make_board(squares)
-    puzzle.load_board(board)
+    read_and_load()
+    print("step #0")
     puzzle.print()
 
-    easy_reveals = puzzle._easy_reveals()
-    print(easy_reveals)
-    for x, y in easy_reveals:
-        right_click(x, y)
+    newFlags = True
+    newReveals = True
+    current_step = 1
+    while (newFlags or newReveals) and not puzzle.is_over():
+        read_and_load()
 
+        easy_flags = puzzle._mark_easy_flags()
+        newFlags = (easy_flags != set())
+        for x, y in easy_flags:
+            right_click(x, y)
 
-    src = BeautifulSoup(driver.page_source, "lxml")
-    squares = src.find_all(class_="square")
-    board = make_board(squares)
-    puzzle.load_board(board)
-    puzzle.print()
+        print(f"step #{current_step}")
+        current_step += 1
+        puzzle.print()
+
+        read_and_load()
+
+        easy_reveals = puzzle._easy_reveals()
+        newReveals = (easy_reveals != set())
+        for x, y in easy_reveals:
+            left_click(x, y)
+
+        print(f"step #{current_step}")
+        current_step += 1
+        puzzle.print()
+
 
     driver.quit()    
 
